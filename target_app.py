@@ -1,3 +1,4 @@
+# target_app.py
 # This is the simple "real" web application we want to protect.
 # It will run on port 8080 and should NOT be exposed publicly.
 # Only our 'siteguard_app.py' WAF will talk to this.
@@ -10,7 +11,7 @@ app = Flask(__name__)
 LOGIN_PAGE = """
 <html>
 <head>
-    <title>insecure girl</title>
+    <title>Target App Login</title>
     <style>
         body { font-family: sans-serif; display: grid; place-items: center; min-height: 80vh; background-color: #f4f4f4; }
         form { background: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
@@ -24,15 +25,15 @@ LOGIN_PAGE = """
     <form action="/login" method="POST">
         <h2>Target App Login</h2>
         <div>
-            <label for="username">daal do - username :</label>
+            <label for="username">Username:</label>
             <input type="text" id="username" name="username">
         </div>
         <div>
-            <label for="password">undress me by entering password:</label>
+            <label for="password">Password:</label>
             <input type="password" id="password" name="password">
         </div>
         <button type="submit">Login</button>
-        <p><small>Hint: acha -_-</small></p>
+        <p><small>Hint: admin / password123</small></p>
     </form>
 </body>
 </html>
@@ -41,7 +42,7 @@ LOGIN_PAGE = """
 @app.route('/')
 def home():
     """ The main homepage. """
-    return '<h1>I am insecure girl #proudR </h1><p>This is the application being protected by Siteguard.</p><a href="/login">Login</a> | <a href="/secret">Secret Page</a>'
+    return '<h1>Welcome to the Target App!</h1><p>This is the application being protected by Siteguard.</p><a href="/login">Login</a> | <a href="/secret">Secret Page</a>'
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -53,12 +54,12 @@ def login():
         # This is our "secure" login logic
         if username == 'admin' and password == 'password123':
             # On success, send a success message.
-            resp = make_response('<h1>f yes u undressed me !</h1><p>Welcome, nigger.</p><a href="/">Home</a>', 200)
+            resp = make_response('<h1>Login Successful!</h1><p>Welcome, admin.</p><a href="/">Home</a>', 200)
             return resp
         else:
             # On failure, return a 401 Unauthorized status.
             # Our WAF will be watching for this status code!
-            resp = make_response('<h1>Login Failed.</h1><p>U failed to undress me .</p>' + LOGIN_PAGE, 401)
+            resp = make_response('<h1>Login Failed.</h1><p>Incorrect username or password.</p>' + LOGIN_PAGE, 401)
             return resp
             
     # For GET request, just show the login form
@@ -67,7 +68,7 @@ def login():
 @app.route('/secret')
 def secret():
     """ A "protected" page. """
-    return '<h1>This is the Secret Room u have undressed me well</h1><p>You should only see this if you are "logged in" (or just know the URL).</p>'
+    return '<h1>This is the Secret Page</h1><p>You should only see this.</p>'
 
 if __name__ == '__main__':
     # Run this app on port 8080.
