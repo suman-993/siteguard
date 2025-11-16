@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Siteguard Dashboard</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom font */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-900">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="mb-8">
+            <h1 class="text-4xl font-bold text-gray-800">Siteguard WAF Dashboard</h1>
+            <p class="text-lg text-gray-600">Live monitoring of suspicious activity.</p>
+        </header>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-sm font-medium text-gray-500 uppercase">Total Block Events</h2>
+                <p id="stat-total-events" class="text-3xl font-bold text-red-600">0</p>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-sm font-medium text-gray-500 uppercase">Currently Blocked IPs</h2>
+                <p id="stat-blocked-ips" class="text-3xl font-bold text-orange-600">0</p>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-sm font-medium text-gray-500 uppercase">Attack Types Detected</h2>
+                <div id="stat-attack-types" class="text-sm mt-2 space-y-1">
+                    <p class="text-gray-500">No data</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            <!-- Currently Blocked IPs Table -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-xl font-semibold mb-4">Currently Blocked IPs</h2>
+                <div class="overflow-x-auto max-h-96 overflow-y-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Blocked Until</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-blocked-ips" class="bg-white divide-y divide-gray-200">
+                            <!-- JS will populate this -->
+                            <tr>
+                                <td colspan="3" class="px-4 py-4 text-sm text-gray-500 text-center">No blocked IPs.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Suspicious Activity Log -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-xl font-semibold mb-4">Suspicious Activity Log (Last 50)</h2>
+                <div class="overflow-x-auto max-h-96 overflow-y-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Path</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-suspicious-logs" class="bg-white divide-y divide-gray-200">
+                            <!-- JS will populate this -->
+                             <tr>
+                                <td colspan="4" class="px-4 py-4 text-sm text-gray-500 text-center">No suspicious activity.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/siteguard_dashboard/data';
+
+        // --- Element Selectors ---
+        const statTotalEvents = document.getElementById('stat-total-events');
+        const statBlockedIPs = document.getElementById('stat-blocked-ips');
+        const statAttackTypes = document.getElementById('stat-attack-types');
+        const tableBlockedIPs = document.getElementById('table-blocked-ips');
+        const tableSuspiciousLogs = document.getElementById('table-suspicious-logs');
+
+        /**
+         * Formats a datetime string into a more readable format.
+         */
+        function formatDateTime(isoString) {
+            if (!isoString) return 'N/A';
+            try {
+                const date = new Date(isoString);
+                // Format: YYYY-MM-DD HH:MM:SS
+                return date.toISOString().replace('T', ' ').substring(0, 19);
+            } catch (e) {
+                return isoString;
+            }
+        }
+
+        /**
+         * Updates the attack types card.
+         */
+        function updateAttackTypes(types) {
+            if (!types || types.length === 0) {
+                statAttackTypes.innerHTML = '<p class="text-gray-500">No data</p>';
+                return;
+            }
+            
+            statAttackTypes.innerHTML = types.map(type => `
+                <div class="flex justify-between">
+                    <span class="font-medium text-gray-700">${type.reason}</span>
+                    <span class="font-bold text-blue-600">${type.count}</span>
+                </div>
+            `).join('');
+        }
+
+        /**
+         * Updates the blocked IPs table.
+         */
+        function updateBlockedIPsTable(ips) {
+            if (!ips || ips.length === 0) {
+                tableBlockedIPs.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-sm text-gray-500 text-center">No blocked IPs.</td></tr>';
+                return;
+            }
+
+            tableBlockedIPs.innerHTML = ips.map(ip => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900">${ip.ip_address}</td>
+                    <td class="px-4 py-3 text-sm text-red-600">${ip.reason}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">${formatDateTime(ip.blocked_until)}</td>
+                </tr>
+            `).join('');
+        }
+
+        /**
+         * Updates the suspicious logs table.
+         */
+        function updateSuspiciousLogsTable(logs) {
+            if (!logs || logs.length === 0) {
+                tableSuspiciousLogs.innerHTML = '<tr><td colspan="4" class="px-4 py-4 text-sm text-gray-500 text-center">No suspicious activity.</td></tr>';
+                return;
+            }
+
+            tableSuspiciousLogs.innerHTML = logs.map(log => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">${formatDateTime(log.timestamp)}</td>
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900">${log.ip_address}</td>
+                    <td class="px-4 py-3 text-sm text-gray-700">${log.reason}</td>
+                    <td class="px-4 py-3 text-sm text-gray-500 truncate" title="${log.request_path}">${log.request_path}</td>
+                </tr>
+            `).join('');
+        }
+
+        /**
+         * Main function to fetch and update data.
+         */
+        async function fetchData() {
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) {
+                    console.error('Failed to fetch dashboard data');
+                    return;
+                }
+                const data = await response.json();
+
+                // Update Stats
+                statTotalEvents.textContent = data.stats.total_blocked_events || 0;
+                statBlockedIPs.textContent = data.stats.unique_blocked_ips || 0;
+                
+                // Update Cards and Tables
+                updateAttackTypes(data.stats.attack_types);
+                updateBlockedIPsTable(data.blocked_ips);
+                updateSuspiciousLogsTable(data.logs);
+
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        }
+
+        // Fetch data on load and then every 3 seconds
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchData();
+            setInterval(fetchData, 3000);
+        });
+    </script>
+</body>
+</html>
